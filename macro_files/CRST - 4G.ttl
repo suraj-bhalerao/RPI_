@@ -1,0 +1,18 @@
+*GET#IMEI#
+pause 3
+
+*GET#ICCID#
+pause 3
+
+*GET#VIN#
+pause 3
+
+*GET#UIN#
+pause 3
+
+*GET#ICCID#
+pause 3
+
+*GET#CIP1#
+pause 3
+
