@@ -1,6 +1,5 @@
 from tkinter import filedialog, messagebox, Toplevel, Text, BOTH, END
 
-
 def view_log():
     file_path = filedialog.askopenfilename(filetypes=[("Log Files", "*.log")])
     if file_path:

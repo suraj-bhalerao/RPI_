@@ -9,7 +9,7 @@ class SerialUtility:
     def __init__(self, root):
         self.root = root
         self.root.title("AEPL Logger (Disconnected)")
-        self.root.geometry("800x600")
+        self.root.geometry("850x700")
 
         try:
             self.root.iconbitmap(r"img.ico")
@@ -18,6 +18,7 @@ class SerialUtility:
 
         self.log_console = scrolledtext.ScrolledText(self.root, wrap=tk.NONE, bg="black", fg="white", font=("Consolas", 10))
         self.log_console.pack(expand=True, fill=tk.BOTH)
+        self.log_console.bind("<Key>", self.block_typing_during_logging)
 
         self.color_tags = {
             'AIS': '#0039a6', 'CVP': 'blue', 'CAN': 'magenta',
@@ -123,3 +124,7 @@ class SerialUtility:
 
     def show_about(self):
         messagebox.showinfo("About", "AEPL Logger\nVersion 1.0")
+
+    def block_typing_during_logging(self, event):
+        if self.serial_manager.logging_active:
+            return "break"

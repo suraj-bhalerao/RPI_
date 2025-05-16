@@ -1,18 +1,8 @@
 *GET#IMEI#
-pause 3
+pause 10
 
-*GET#ICCID#
-pause 3
+*SET#CRST#1#
+pause 30
 
-*GET#VIN#
-pause 3
-
-*GET#UIN#
-pause 3
-
-*GET#ICCID#
-pause 3
-
-*GET#CIP1#
-pause 3
-
+*SET#CRST#1#
+pause 30
