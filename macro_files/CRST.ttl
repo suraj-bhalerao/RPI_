@@ -1,5 +1,8 @@
-*GET#IMEI#
-pause 10
+*SET#CRST#1#
+pause 30
+
+*SET#CRST#1#
+pause 30
 
 *SET#CRST#1#
 pause 30

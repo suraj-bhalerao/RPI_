@@ -36,7 +36,9 @@ class SerialUtility:
         self.root.bind_all("<Control-q>", lambda e: self.serial_manager.stop_logging())
         self.root.bind_all("<Control-m>", lambda e: self.root.iconify())
         self.root.bind_all("<space>", lambda e: self.scroll_to_bottom())
+        self.root.bind_all("<Return>", lambda e: self.scroll_to_bottom())
         self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)
+        self.root.bind_all("<Control-v>", self.paste_text)
 
         self.user_scrolled = False
 
@@ -73,19 +75,28 @@ class SerialUtility:
         self.root.config(menu=menu_bar)
 
     def insert_log(self, message):
-        tag = None
-        for keyword, tagname in self.color_tags.items():
-            if keyword in message:
-                tag = keyword.lower()
-                break
+        # Break lines at specific characters if not already split
+        split_lines = re.split(r'(?<!\n)[|+](?=\w)', message)  # Split on '|' or '+' only if not preceded by newline
 
-        if tag:
-            self.log_console.insert(tk.END, message + "\n", tag)
-        else:
-            self.log_console.insert(tk.END, message + "\n")
+        for line in split_lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            tag = None
+            for keyword in self.color_tags:
+                if keyword in line:
+                    tag = keyword.lower()
+                    break
+
+            if tag:
+                self.log_console.insert(tk.END, line + "\n", tag)
+            else:
+                self.log_console.insert(tk.END, line + "\n")
 
         if not self.user_scrolled:
             self.log_console.yview(tk.END)
+
 
     def copy_text(self):
         try:
@@ -95,7 +106,7 @@ class SerialUtility:
         except tk.TclError:
             messagebox.showwarning("Copy", "No text selected to copy.")
 
-    def paste_text(self):
+    def paste_text(self, event=None):
         try:
             clipboard = self.root.clipboard_get()
             self.log_console.insert(tk.END, clipboard + "\n")
@@ -105,16 +116,17 @@ class SerialUtility:
                 for line in clipboard.strip().splitlines():
                     if line.startswith('*'):
                         self.serial_manager.serial_port.write((line + '\n').encode())
-                        self.insert_log(f"Sent command: {line}")
+                        self.insert_log(f"{line}")
         except tk.TclError:
             messagebox.showwarning("Paste", "Clipboard is empty or cannot be accessed.")
+        return "break"
 
     def on_mouse_scroll(self, event):
         self.user_scrolled = not self.at_bottom()
 
     def scroll_to_bottom(self):
         self.user_scrolled = False
-        self.log_console.yview(tk.END)
+        self.root.after(10, lambda: self.log_console.yview_moveto(1.0))
 
     def at_bottom(self):
         return self.log_console.yview()[1] == 1.0
