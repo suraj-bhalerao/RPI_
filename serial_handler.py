@@ -59,18 +59,19 @@ class SerialManager:
                 if not self.serial_port or not (self.serial_port.is_open and self.logging_active):
                     for port in current_ports:
                         try:
-                            temp_port = serial.Serial(port, baudrate=115200, timeout=0.5)
+                            temp_port = serial.Serial(port, baudrate=115200, timeout=0.1)
                             
+                            # Reduced total probe time to 0.2 seconds
                             data_found = False
                             start_time = time.time()
-                            while time.time() - start_time < 1.0:
+                            while time.time() - start_time < 0.2:
                                 if temp_port.in_waiting > 0:
                                     data = temp_port.read(temp_port.in_waiting)
                                     if data:
                                         data_found = True
                                         break
-                                time.sleep(0.1)
-
+                                time.sleep(0.01) 
+                            
                             if data_found:
                                 if self.serial_port and self.serial_port.is_open:
                                     self.serial_port.close()
@@ -84,10 +85,9 @@ class SerialManager:
                             self.log_queue.put(f"Could not open {port}: {e}")
 
                 known_ports = current_ports
-                time.sleep(2)
+                time.sleep(1) 
             except Exception as e:
                 self.log_queue.put(f"Port monitor error: {e}")
-
 
     def start_logging(self):
         if not self.serial_port:
