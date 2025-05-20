@@ -5,20 +5,20 @@ from macro_executor import MacroExecutor
 from log_utils import view_log, change_directory
 import re
 
-class SerialUtility:
+class UI:
     def __init__(self, root):
         self.root = root
         self.root.title("AEPL Logger (Disconnected)")
         self.root.geometry("850x700")
 
         try:
-            self.root.iconbitmap(r"img.ico")
+            self.root.iconbitmap(r"./Assets/img.ico")
         except Exception as e:
             print(f"Error setting icon: {e}")
 
         self.log_console = scrolledtext.ScrolledText(self.root, wrap=tk.NONE, bg="black", fg="white", font=("Consolas", 10))
         self.log_console.pack(expand=True, fill=tk.BOTH)
-        self.log_console.bind("<Key>", self.block_typing_during_logging)
+        self.log_console.bind("<KeyPress>", self.block_typing_during_logging)
 
         self.color_tags = {
             'AIS': '#0039a6', 'CVP': 'blue', 'CAN': 'magenta',
@@ -32,13 +32,18 @@ class SerialUtility:
 
         self.create_menu()
 
+        # Global key bindings
         self.root.bind_all("<Control-l>", lambda e: self.serial_manager.start_logging())
         self.root.bind_all("<Control-q>", lambda e: self.serial_manager.stop_logging())
         self.root.bind_all("<Control-m>", lambda e: self.root.iconify())
         self.root.bind_all("<space>", lambda e: self.scroll_to_bottom())
         self.root.bind_all("<Return>", lambda e: self.scroll_to_bottom())
+        self.log_console.bind("<Control-c>", self.copy_text)
+        self.log_console.bind("<Control-v>", self.paste_text)
+        self.log_console.bind("<Control-a>", self.select_all)
+
+
         self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)
-        self.root.bind_all("<Control-v>", self.paste_text)
 
         self.user_scrolled = False
 
@@ -48,8 +53,8 @@ class SerialUtility:
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Start Logging", command=self.serial_manager.start_logging, accelerator="Ctrl+L")
         file_menu.add_command(label="Stop Logging", command=self.serial_manager.stop_logging, accelerator="Ctrl+Q")
-        file_menu.add_command(label="View Log", command=view_log)
-        file_menu.add_command(label="Change Directory", command=change_directory)
+        # file_menu.add_command(label="View Log", command=view_log)
+        # file_menu.add_command(label="Change Directory", command=change_directory)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit, accelerator="Alt+Q")
         menu_bar.add_cascade(label="File", menu=file_menu)
@@ -75,8 +80,7 @@ class SerialUtility:
         self.root.config(menu=menu_bar)
 
     def insert_log(self, message):
-        # Break lines at specific characters if not already split
-        split_lines = re.split(r'(?<!\n)[|+](?=\w)', message)  # Split on '|' or '+' only if not preceded by newline
+        split_lines = re.split(r'(?<!\n)[|+](?=\w)', message)
 
         for line in split_lines:
             line = line.strip()
@@ -97,14 +101,14 @@ class SerialUtility:
         if not self.user_scrolled:
             self.log_console.yview(tk.END)
 
-
-    def copy_text(self):
+    def copy_text(self, event=None):
         try:
             selected = self.log_console.get("sel.first", "sel.last")
             self.root.clipboard_clear()
             self.root.clipboard_append(selected)
         except tk.TclError:
             messagebox.showwarning("Copy", "No text selected to copy.")
+        return "break"
 
     def paste_text(self, event=None):
         try:
@@ -119,6 +123,10 @@ class SerialUtility:
                         self.insert_log(f"{line}")
         except tk.TclError:
             messagebox.showwarning("Paste", "Clipboard is empty or cannot be accessed.")
+        return "break"
+
+    def select_all(self, event=None):
+        self.log_console.tag_add("sel", "1.0", "end")
         return "break"
 
     def on_mouse_scroll(self, event):
@@ -139,4 +147,6 @@ class SerialUtility:
 
     def block_typing_during_logging(self, event):
         if self.serial_manager.logging_active:
+            if event.state & 0x0004 or event.keysym in ['space', 'Return']:
+                return None
             return "break"

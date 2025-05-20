@@ -90,7 +90,7 @@ class SerialManager:
             self.buffered_lines.clear()
             self.thread = threading.Thread(target=self.read_serial, daemon=True)
             self.thread.start()
-            self.log_queue.put("Logging started...")
+            # self.log_queue.put("Logging started...")
             self.send_command("*GET#IMEI#")
 
     def stop_logging(self):
@@ -114,7 +114,7 @@ class SerialManager:
     def send_command(self, command):
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.write((command + '\n').encode())
-            self.log_queue.put(f"Sent command: {command}")
+            # self.log_queue.put(f"Sent command: {command}")
             if command.strip().upper() == '*GET#IMEI#':
                 self.waiting_for_imei = True
 
@@ -160,7 +160,7 @@ class SerialManager:
                                 except Exception as e:
                                     self.log_queue.put(f"Error creating IMEI log file: {e}")
 
-                                self.log_queue.put(f"IMEI detected: {imei} — Log file: {new_log_path}")
+                                # self.log_queue.put(f"IMEI detected: {imei} — Log file: {new_log_path}")
                                 self.waiting_for_imei = False
 
                         log_target = self.imei_log_file if self.imei_log_file else self.fallback_log_file

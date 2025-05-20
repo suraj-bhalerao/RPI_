@@ -1,7 +1,7 @@
 import tkinter as tk
-from ui import SerialUtility
+from ui import UI
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = SerialUtility(root)
+    app = UI(root)
     root.mainloop()
