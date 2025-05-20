@@ -1,6 +1,4 @@
 logs
-<<<<<<< HEAD
-=======
 build
->>>>>>> 2814cdd4b6270bb7a378f492ca80e357a7c7ef59
 dist
+__pycache__
