@@ -49,29 +49,45 @@ class SerialManager:
         while True:
             try:
                 current_ports = set(p.device for p in serial.tools.list_ports.comports())
-                new_ports = current_ports - known_ports
                 lost_ports = known_ports - current_ports
-
-                if new_ports:
-                    for port in new_ports:
-                        try:
-                            self.serial_port = serial.Serial(port, baudrate=115200, timeout=0.1)
-                            self.ui.root.title(f"AEPL Logger (Connected: {port})")
-                            self.start_logging()
-                            break
-                        except serial.SerialException as e:
-                            self.log_queue.put(f"Could not open {port}: {e}")
-                        except PermissionError as e:
-                            self.log_queue.put(f"Permission denied on {port}: {e}")
 
                 if lost_ports and self.serial_port and self.serial_port.port in lost_ports:
                     self.ui.root.title("AEPL Logger (Disconnected)")
                     self.stop_logging()
+                    self.serial_port = None
+
+                if not self.serial_port or not (self.serial_port.is_open and self.logging_active):
+                    for port in current_ports:
+                        try:
+                            temp_port = serial.Serial(port, baudrate=115200, timeout=0.5)
+                            
+                            data_found = False
+                            start_time = time.time()
+                            while time.time() - start_time < 1.0:
+                                if temp_port.in_waiting > 0:
+                                    data = temp_port.read(temp_port.in_waiting)
+                                    if data:
+                                        data_found = True
+                                        break
+                                time.sleep(0.1)
+
+                            if data_found:
+                                if self.serial_port and self.serial_port.is_open:
+                                    self.serial_port.close()
+                                self.serial_port = temp_port
+                                self.ui.root.title(f"AEPL Logger (Connected: {port})")
+                                self.start_logging()
+                                break
+                            else:
+                                temp_port.close()
+                        except (serial.SerialException, PermissionError) as e:
+                            self.log_queue.put(f"Could not open {port}: {e}")
 
                 known_ports = current_ports
                 time.sleep(2)
             except Exception as e:
                 self.log_queue.put(f"Port monitor error: {e}")
+
 
     def start_logging(self):
         if not self.serial_port:

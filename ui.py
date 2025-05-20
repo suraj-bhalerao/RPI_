@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import scrolledtext, filedialog, messagebox
 from serial_handler import SerialManager
 from macro_executor import MacroExecutor
-from log_utils import view_log, change_directory
 import re
 
 class UI:
@@ -42,7 +41,6 @@ class UI:
         self.log_console.bind("<Control-v>", self.paste_text)
         self.log_console.bind("<Control-a>", self.select_all)
 
-
         self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)
 
         self.user_scrolled = False
@@ -53,8 +51,6 @@ class UI:
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Start Logging", command=self.serial_manager.start_logging, accelerator="Ctrl+L")
         file_menu.add_command(label="Stop Logging", command=self.serial_manager.stop_logging, accelerator="Ctrl+Q")
-        # file_menu.add_command(label="View Log", command=view_log)
-        # file_menu.add_command(label="Change Directory", command=change_directory)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit, accelerator="Alt+Q")
         menu_bar.add_cascade(label="File", menu=file_menu)
