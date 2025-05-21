@@ -61,7 +61,6 @@ class SerialManager:
                         try:
                             temp_port = serial.Serial(port, baudrate=115200, timeout=0.1)
                             
-                            # Reduced total probe time to 0.2 seconds
                             data_found = False
                             start_time = time.time()
                             while time.time() - start_time < 0.2:
@@ -135,7 +134,6 @@ class SerialManager:
                 self.waiting_for_imei = True
 
     def read_serial(self):
-        # imei_pattern = re.compile(r'IMEI\s*[:\-]?\s*(\d{14,17})', re.IGNORECASE)
         imei_pattern = re.compile(r'STATUS#IMEI#(\d{14,17})#', re.IGNORECASE)
         ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
 
