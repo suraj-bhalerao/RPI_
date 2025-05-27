@@ -5,6 +5,8 @@ from macro_executor import MacroExecutor
 import re
 
 class UI:
+    dev_name = "Suraj Bhalerao"
+
     def __init__(self, root):
         self.root = root
         self.root.title("AEPL Logger (Disconnected)")
@@ -56,8 +58,8 @@ class UI:
         menu_bar.add_cascade(label="File", menu=file_menu)
 
         edit_menu = tk.Menu(menu_bar, tearoff=0)
-        edit_menu.add_command(label="Copy", command=self.copy_text)
-        edit_menu.add_command(label="Paste", command=self.paste_text)
+        edit_menu.add_command(label="Copy", command=self.copy_text, accelerator="Ctrl+C")
+        edit_menu.add_command(label="Paste", command=self.paste_text, accelerator="Ctrl+V")
         menu_bar.add_cascade(label="Edit", menu=edit_menu)
 
         macro_menu = tk.Menu(menu_bar, tearoff=0)
@@ -139,7 +141,7 @@ class UI:
         self.root.state('zoomed')
 
     def show_about(self):
-        messagebox.showinfo("About", "AEPL Logger\nVersion 1.0")
+        messagebox.showinfo(f"About", f"AEPL Logger\nVersion 2.0\n\nDeveloped by {self.dev_name}\n\nThis application logs and manages AEPL data.")
 
     def block_typing_during_logging(self, event):
         if self.serial_manager.logging_active:
