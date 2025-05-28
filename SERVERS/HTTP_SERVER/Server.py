@@ -12,6 +12,9 @@ from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from fastapi.responses import FileResponse, HTMLResponse
 
+# FastAPI app
+app = FastAPI()
+
 # Configuration
 UPLOAD_DIR = "uploaded_logs"
 TEMP_CHUNKS_DIR = "temp_chunks"
@@ -145,7 +148,7 @@ def dashboard(request: Request):
     db = SessionLocal()
     try:
         logs = db.query(LogEntry).order_by(LogEntry.timestamp.desc()).all()
-        return templates.TemplateResponse("index.html", {"request": request, "logs": logs})
+        return templates.TemplateResponse("dashboard.html", {"request": request, "logs": logs})
     finally:
         db.close()
 

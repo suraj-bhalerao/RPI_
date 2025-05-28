@@ -15,8 +15,12 @@
     <!-- Upload Form Toggle -->
     <button @click="showUploadForm = !showUploadForm"
       class="mb-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-      <span x-show="!showUploadForm">📤 Upload New Log</span>
-      <span x-show="showUploadForm">✖ Close Upload</span>
+      <template x-if="!showUploadForm">
+        <span>📤 Upload New Log</span>
+      </template>
+      <template x-if="showUploadForm">
+        <span>✖ Close Upload</span>
+      </template>
     </button>
 
     <!-- Upload Form -->
@@ -34,8 +38,8 @@
         Upload
       </button>
     </form>
+
     <!-- Log Table -->
-    {% if logs %}
     <div class="overflow-auto bg-white rounded shadow">
       <table class="min-w-full text-sm text-left">
         <thead class="bg-gray-200 text-gray-700">
@@ -53,18 +57,16 @@
             <td class="py-2 px-4">{{ log.original_filename }}</td>
             <td class="py-2 px-4">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
             <td class="py-2 px-4 space-x-2">
-              <a href="/view/{{ log.filename }}" class="text-blue-600 hover:underline">View</a>
-              <a href="/download/{{ log.filename }}" class="text-green-600 hover:underline">Download</a>
+              <a href="/view/{{ log.filename }}"
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">View</a>
+              <a href="/download/{{ log.filename }}"
+                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Download</a>
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    {% else %}
-    <p class="text-center text-gray-500 mt-4">No logs uploaded yet.</p>
-    {% endif %}
-
   </div>
 </body>
 
