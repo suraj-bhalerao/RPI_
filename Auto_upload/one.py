@@ -64,6 +64,25 @@ def upload_to_onedrive(file_path, hostname, today_date):
     except Exception as e:
         print(f"Error during upload: {e}")
 
+#### this functions is used to check zero size and currupted files
+# def is_log_file_valid(file_path):
+#     try:
+#         if os.path.getsize(file_path) == 0:
+#             print(f"Skipping empty file: {file_path}")
+#             return False
+#         with open(file_path, 'r', errors='ignore') as f:
+#             content = f.read(1024)  # Read first 1KB
+#             if not any(c.isprintable() for c in content):
+#                 print(f"Skipping possibly corrupted file (unprintable): {file_path}")
+#                 return False
+#         return True
+#     except Exception as e:
+#         print(f"Error validating file {file_path}: {e}")
+#         return False
+
+def is_non_empty_file(file_path):
+    return os.path.getsize(file_path) > 0
+
 def main():
     if is_connected_to_wifi():
         uploaded_logs = load_uploaded_logs()
@@ -81,7 +100,11 @@ def main():
             if is_file_open(log_file_path):
                 print(f"Skipping open file: {log_file}")
                 continue
-
+            # if not is_log_file_valid(log_file_path):
+            #     continue
+            if not is_non_empty_file(log_file_path):
+                print(f"Skipping empty file: {log_file}")
+                continue
             upload_to_onedrive(log_file_path, hostname, today_date)
     else:
         print("Not connected to Wi-Fi.")
