@@ -140,6 +140,7 @@ class UI:
     def at_bottom(self):
         return self.log_console.yview()[1] == 1.0
     
+    
     def on_mouse_scroll_linux_up(self, event):
         self.log_console.yview_scroll(-1, "units")  
         self.user_scrolled = not self.at_bottom()
