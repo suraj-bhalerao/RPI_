@@ -5,7 +5,6 @@ import serial.tools.list_ports
 import os
 import re
 import queue
-import getpass
 
 class SerialManager:
     def __init__(self, ui):
@@ -13,8 +12,11 @@ class SerialManager:
         self.serial_port = None
         self.thread = None
         self.logging_active = False
+        self.waiting_for_imei = False
+        self.imei_log_file = None
+        self.fallback_log_file = None
         self.log_queue = queue.Queue()
-        self.log_file = None
+        self.buffered_lines = []
 
         self.monitor_thread = threading.Thread(target=self.auto_monitor_ports, daemon=True)
         self.monitor_thread.start()
@@ -22,6 +24,7 @@ class SerialManager:
         if not os.path.exists("logs"):
             os.makedirs("logs")
 
+        self._prepare_fallback_log()
         self.ui.root.after(50, self.process_log_queue)
 
     def _get_log_folder(self):
@@ -31,11 +34,15 @@ class SerialManager:
             os.makedirs(folder_path)
         return folder_path
 
-    def _generate_log_path(self):
-        user = getpass.getuser()
-        timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
-        log_name = f"serial_log_{user}_{timestamp}.log"
-        return os.path.join(self._get_log_folder(), log_name)
+    def _prepare_fallback_log(self):
+        log_folder = self._get_log_folder()
+        fallback_path = os.path.join(log_folder, "default.log")
+        if self.fallback_log_file:
+            try:
+                self.fallback_log_file.close()
+            except:
+                pass
+        self.fallback_log_file = open(fallback_path, 'a')
 
     def auto_monitor_ports(self):
         known_ports = set()
@@ -53,6 +60,7 @@ class SerialManager:
                     for port in current_ports:
                         try:
                             temp_port = serial.Serial(port, baudrate=115200, timeout=0.1)
+                            
                             data_found = False
                             start_time = time.time()
                             while time.time() - start_time < 0.2:
@@ -61,8 +69,8 @@ class SerialManager:
                                     if data:
                                         data_found = True
                                         break
-                                time.sleep(0.01)
-
+                                time.sleep(0.01) 
+                            
                             if data_found:
                                 if self.serial_port and self.serial_port.is_open:
                                     self.serial_port.close()
@@ -76,39 +84,59 @@ class SerialManager:
                             self.log_queue.put(f"Could not open {port}: {e}")
 
                 known_ports = current_ports
-                time.sleep(1)
+                time.sleep(1) 
             except Exception as e:
                 self.log_queue.put(f"Port monitor error: {e}")
 
     def start_logging(self):
-        if not self.serial_port or self.logging_active:
+        if not self.serial_port:
             return
-
-        self.logging_active = True
-        log_path = self._generate_log_path()
-        self.log_file = open(log_path, 'a')
-        self.thread = threading.Thread(target=self.read_serial, daemon=True)
-        self.thread.start()
-        self.send_command("*GET#IMEI#")  # Optional; can be removed if undesired
+        if not self.logging_active:
+            self.logging_active = True
+            if not self.fallback_log_file:
+                self._prepare_fallback_log()
+            self.waiting_for_imei = True
+            if self.imei_log_file:
+                try:
+                    self.imei_log_file.close()
+                except:
+                    pass
+                self.imei_log_file = None
+            self.buffered_lines.clear()
+            self.thread = threading.Thread(target=self.read_serial, daemon=True)
+            self.thread.start()
+            # self.log_queue.put("Logging started...")
+            self.send_command("*GET#IMEI#")
 
     def stop_logging(self):
         self.logging_active = False
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.close()
-        if self.log_file:
+        if self.imei_log_file:
             try:
-                self.log_file.close()
+                self.imei_log_file.close()
             except:
                 pass
-            self.log_file = None
+            self.imei_log_file = None
+        if self.fallback_log_file:
+            try:
+                self.fallback_log_file.close()
+            except:
+                pass
+            self.fallback_log_file = None
         self.log_queue.put("Logging stopped.")
 
     def send_command(self, command):
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.write((command + '\n').encode())
+            # self.log_queue.put(f"Sent command: {command}")
+            if command.strip().upper() == '*GET#IMEI#':
+                self.waiting_for_imei = True
 
     def read_serial(self):
+        imei_pattern = re.compile(r'STATUS#IMEI#(\d{14,17})#', re.IGNORECASE)
         ansi_escape = re.compile(r'\x1B\[[0-?]*[ -/]*[@-~]')
+
         buffer = ""
 
         while self.logging_active:
@@ -116,6 +144,7 @@ class SerialManager:
                 if self.serial_port.in_waiting:
                     raw_data = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8', errors='ignore')
                     buffer += raw_data
+
                     lines = buffer.splitlines(keepends=False)
                     if raw_data and not raw_data.endswith("\n"):
                         buffer = lines.pop() if lines else buffer
@@ -124,10 +153,35 @@ class SerialManager:
 
                     for line in lines:
                         clean_line = ansi_escape.sub('', line)
-                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                        self.log_file.write(f"{timestamp} - {clean_line}\n")
-                        self.log_file.flush()
                         self.log_queue.put(clean_line)
+
+                        if self.waiting_for_imei:
+                            self.buffered_lines.append(clean_line)
+                            match = imei_pattern.search(clean_line)
+                            if match:
+                                imei = match.group(1)
+                                log_folder = self._get_log_folder()
+                                timestamp_str = time.strftime("%Y-%m-%d - %H.%M")
+                                new_log_name = f"{imei} - {timestamp_str}.log"
+                                new_log_path = os.path.join(log_folder, new_log_name)
+
+                                try:
+                                    self.imei_log_file = open(new_log_path, 'a')
+                                    for buffered in self.buffered_lines:
+                                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                                        self.imei_log_file.write(f"{timestamp} - {buffered}\n")
+                                    self.buffered_lines.clear()
+                                except Exception as e:
+                                    self.log_queue.put(f"Error creating IMEI log file: {e}")
+
+                                # self.log_queue.put(f"IMEI detected: {imei} — Log file: {new_log_path}")
+                                self.waiting_for_imei = False
+
+                        log_target = self.imei_log_file if self.imei_log_file else self.fallback_log_file
+                        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+                        log_target.write(f"{timestamp} - {clean_line}\n")
+                        log_target.flush()
+
             except Exception as e:
                 self.log_queue.put(f"Error: {e}")
                 break
