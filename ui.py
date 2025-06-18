@@ -43,7 +43,10 @@ class UI:
         self.log_console.bind("<Control-v>", self.paste_text)
         self.log_console.bind("<Control-a>", self.select_all)
 
-        self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)
+        self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)         
+        self.log_console.bind("<Button-4>", self.on_mouse_scroll_linux_up)  
+        self.log_console.bind("<Button-5>", self.on_mouse_scroll_linux_down)
+
 
         self.user_scrolled = False
 
@@ -136,6 +139,16 @@ class UI:
 
     def at_bottom(self):
         return self.log_console.yview()[1] == 1.0
+    
+    def on_mouse_scroll_linux_up(self, event):
+        self.log_console.yview_scroll(-1, "units")  
+        self.user_scrolled = not self.at_bottom()
+        return "break"
+
+    def on_mouse_scroll_linux_down(self, event):
+        self.log_console.yview_scroll(1, "units")   
+        self.user_scrolled = not self.at_bottom()
+        return "break"
 
     def maximize_window(self):
         self.root.state('zoomed')
