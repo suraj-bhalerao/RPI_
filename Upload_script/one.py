@@ -5,8 +5,8 @@ import platform
 import time
 from datetime import datetime
 
-LOG_DIR = "/home/Sharukh/CIAP"
-ONEDRIVE_DIR = "AEPL:/Rpi_Logs"
+BASE_LOG_DIR = "/home/Sharukh/CIAP/logs"
+ONEDRIVE_ROOT = "AEPL:/Rpi_Logs"
 UPLOADED_LOGS_FILE = "/home/Sharukh/CIAP/uploaded_logs.txt"
 
 def is_connected_to_wifi():
@@ -31,8 +31,15 @@ def is_file_open(file_path):
         print(f"Error checking if file is open: {e}")
         return False
 
-def get_log_files():
-    return [f for f in os.listdir(LOG_DIR) if f.startswith("serial_log_") and f.endswith(".log")]
+def get_all_log_files():
+    log_files = []
+    for root, dirs, files in os.walk(BASE_LOG_DIR):
+        for file in files:
+            if file.endswith(".log") and file.startswith("serial_log_"):
+                full_path = os.path.join(root, file)
+                date_part = os.path.basename(os.path.dirname(full_path))
+                log_files.append((full_path, date_part))
+    return log_files
 
 def load_uploaded_logs():
     if not os.path.exists(UPLOADED_LOGS_FILE):
@@ -44,75 +51,49 @@ def mark_log_as_uploaded(log_file):
     with open(UPLOADED_LOGS_FILE, 'a') as f:
         f.write(log_file + '\n')
 
-def upload_to_onedrive(file_path, hostname, today_date):
+def upload_to_onedrive(file_path, hostname, date_part):
     if not os.path.isfile(file_path):
         print(f"File not found: {file_path}")
         return
 
-    remote_dir = f"{ONEDRIVE_DIR}/{hostname}/{today_date}"
-
+    remote_dir = f"{ONEDRIVE_ROOT}/{hostname}/{date_part}"
     try:
-        result = subprocess.run([
-            "/usr/bin/rclone", "copy", file_path, remote_dir
-        ], capture_output=True, text=True)
-
+        result = subprocess.run(
+            ["/usr/bin/rclone", "copy", file_path, remote_dir],
+            capture_output=True,
+            text=True
+        )
         if result.returncode == 0:
-            print(f"Uploaded {file_path} to {remote_dir}.")
+            print(f"Uploaded: {file_path} → {remote_dir}")
             mark_log_as_uploaded(os.path.basename(file_path))
         else:
-            print(f"Error uploading {file_path}: {result.stderr}")
+            print(f"Upload error: {result.stderr}")
     except Exception as e:
-        print(f"Error during upload: {e}")
-
-#### this functions is used to check zero size and currupted files
-# def is_log_file_valid(file_path):
-#     try:
-#         if os.path.getsize(file_path) == 0:
-#             print(f"Skipping empty file: {file_path}")
-#             return False
-#         with open(file_path, 'r', errors='ignore') as f:
-#             content = f.read(1024)  # Read first 1KB
-#             if not any(c.isprintable() for c in content):
-#                 print(f"Skipping possibly corrupted file (unprintable): {file_path}")
-#                 return False
-#         return True
-#     except Exception as e:
-#         print(f"Error validating file {file_path}: {e}")
-#         return False
-
-def is_non_empty_file(file_path):
-    return os.path.getsize(file_path) > 0
+        print(f"Upload failed: {e}")
 
 def main():
     if is_connected_to_wifi():
         uploaded_logs = load_uploaded_logs()
-        log_files = get_log_files()
         hostname = platform.node()
-        today_date = datetime.now().strftime("%Y-%m-%d")
 
-        for log_file in log_files:
-            if log_file in uploaded_logs:
-                print(f"Already uploaded: {log_file}")
+        for file_path, date_part in get_all_log_files():
+            file_name = os.path.basename(file_path)
+
+            if file_name in uploaded_logs:
+                print(f"Already uploaded: {file_name}")
+                continue
+            if is_file_open(file_path):
+                print(f"Skipping open file: {file_name}")
                 continue
 
-            log_file_path = os.path.join(LOG_DIR, log_file)
-
-            if is_file_open(log_file_path):
-                print(f"Skipping open file: {log_file}")
-                continue
-            # if not is_log_file_valid(log_file_path):
-            #     continue
-            if not is_non_empty_file(log_file_path):
-                print(f"Skipping empty file: {log_file}")
-                continue
-            upload_to_onedrive(log_file_path, hostname, today_date)
+            upload_to_onedrive(file_path, hostname, date_part)
     else:
-        print("Not connected to Wi-Fi.")
+        print("Wi-Fi not connected. Skipping upload.")
 
 def main_loop():
     while True:
         main()
-        time.sleep(30)  
+        time.sleep(30) 
 
 if __name__ == "__main__":
     main_loop()
