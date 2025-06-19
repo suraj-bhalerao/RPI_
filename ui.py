@@ -1,8 +1,9 @@
 import tkinter as tk
-from tkinter import scrolledtext, filedialog, messagebox
+from tkinter import scrolledtext, filedialog, messagebox, PhotoImage
 from serial_handler import SerialManager
 from macro_executor import MacroExecutor
 import re
+import sys
 
 class UI:
     dev_name = "Suraj Bhalerao"
@@ -13,7 +14,11 @@ class UI:
         self.root.geometry("850x700")
 
         try:
-            self.root.iconbitmap(r"./Assets/img.ico")
+            if sys.platform.startswith("win"):
+                self.root.iconbitmap(r"./Assets/img.ico")
+            else:
+                icon = PhotoImage(file="./Assets/icon.png")
+                self.root.iconphoto(True, icon)
         except Exception as e:
             print(f"Error setting icon: {e}")
 
@@ -139,7 +144,6 @@ class UI:
 
     def at_bottom(self):
         return self.log_console.yview()[1] == 1.0
-    
     
     def on_mouse_scroll_linux_up(self, event):
         self.log_console.yview_scroll(-1, "units")  
