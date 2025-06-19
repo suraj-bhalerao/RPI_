@@ -7,7 +7,7 @@ from datetime import datetime
 
 BASE_LOG_DIR = "/home/Sharukh/CIAP/logs"
 ONEDRIVE_ROOT = "AEPL:/Rpi_Logs"
-UPLOADED_LOGS_FILE = "/home/Sharukh/CIAP/uploaded_logs.txt"
+UPLOADED_LOGS_FILE = "/home/Sharukh/CIAP/logs/uploaded_logs.txt"
 
 def is_connected_to_wifi():
     try:

@@ -1,0 +1,12 @@
+[Unit]
+Description=Upload RPi Logs to OneDrive
+After=network.target
+ 
+[Service]
+ExecStart=/usr/bin/python3 /home/Sharukh/CIAP/one.py
+WorkingDirectory=/home/Sharukh/CIAP/
+Restart=always
+User=Sharukh
+ 
+[Install]
+WantedBy=multi-user.target

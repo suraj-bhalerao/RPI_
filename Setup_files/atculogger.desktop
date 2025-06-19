@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=atculogger
+Type=Appl ication
+Exec=bash -i /home/Sharukh/Desktop/AEP.sh
+Icon=utilities-terminal
+Terminal=true
+Categories=Application;
