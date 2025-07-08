@@ -5,7 +5,7 @@ import serial.tools.list_ports
 import os
 import re
 import queue
-import getpass
+import platform
 
 class SerialManager:
     def __init__(self, ui):
@@ -36,7 +36,7 @@ class SerialManager:
         return folder_path
 
     def _generate_log_path(self):
-        user = getpass.getuser()
+        user = platform.node()
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename = f"serial_log_{self.imei}_{user}_{timestamp}.log"
         return os.path.join(self._get_log_folder(), filename)
