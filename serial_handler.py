@@ -7,6 +7,7 @@ import re
 import queue
 import platform
 
+## Name added here - Suraj Bhalerao
 class SerialManager:
     def __init__(self, ui):
         self.ui = ui
