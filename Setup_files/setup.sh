@@ -64,6 +64,19 @@ else
     echo "⚠️ atculogger.desktop not found."
 fi
 
+# --- RTC Battery Charging Config --- 
+echo "Configuring RTC battery charging..."
+CONFIG_FILE="/boot/firmware/config.txt"
+RTC_PARAM="dtparam=rtc_bbat_vchg=3000000"
+
+# Append only if the parameter is not already present
+if ! grep -Fxq "$RTC_PARAM" "$CONFIG_FILE"; then
+    echo "$RTC_PARAM" | sudo tee -a "$CONFIG_FILE" > /dev/null
+    echo "RTC charging parameter added."
+else
+    echo "RTC charging parameter already present."
+fi
+
 # --- Create Systemd Service ---
 echo "🛠️ Creating systemd service: $SERVICE_NAME"
 sudo bash -c "cat > $SERVICE_PATH" << EOF

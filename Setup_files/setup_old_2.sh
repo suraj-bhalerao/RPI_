@@ -48,6 +48,19 @@ echo "Copying autostart desktop file..."
 sudo cp "$CIAP_DIR/Setup_files/atculogger.desktop" "$AUTOSTART_DIR/"
 sudo chmod +x "$AUTOSTART_DIR/atculogger.desktop"
 
+# --- RTC Battery Charging Config --- 
+echo "Configuring RTC battery charging..."
+CONFIG_FILE="/boot/firmware/config.txt"
+RTC_PARAM="dtparam=rtc_bbat_vchg=3000000"
+
+# Append only if the parameter is not already present
+if ! grep -Fxq "$RTC_PARAM" "$CONFIG_FILE"; then
+    echo "$RTC_PARAM" | sudo tee -a "$CONFIG_FILE" > /dev/null
+    echo "RTC charging parameter added."
+else
+    echo "RTC charging parameter already present."
+fi
+
 # --- Create systemd service for one.py ---
 echo "Creating systemd service for one.py..."
 sudo bash -c "cat > $SERVICE_PATH" << EOF
