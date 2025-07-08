@@ -5,14 +5,13 @@ USER_NAME="Sharukh"
 HOME_DIR="/home/$USER_NAME"
 CIAP_DIR="$HOME_DIR/CIAP"
 SETUP_DIR="$CIAP_DIR/Setup_files"
-# UPLOAD_SCRIPT="$CIAP_DIR/Upload_script"
 DESKTOP_DIR="$HOME_DIR/Desktop"
 GIT_REPO_URL="https://github.com/suraj-bhalerao/RPI_.git"
 RC_LOCAL="/etc/rc.local"
 AUTOSTART_DIR="/etc/xdg/autostart"
 SERVICE_NAME="onedrive-upload.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
-PYTHON_SCRIPT="$CIAP/one.py"
+PYTHON_SCRIPT="/home/Sharukh/CIAP/one.py"
 
 # --- Update & Install Essentials ---
 echo "🔄 Updating system..."
@@ -68,7 +67,6 @@ fi
 echo "Configuring RTC battery charging..."
 CONFIG_FILE="/boot/firmware/config.txt"
 RTC_PARAM="dtparam=rtc_bbat_vchg=3000000"
-
 # Append only if the parameter is not already present
 if ! grep -Fxq "$RTC_PARAM" "$CONFIG_FILE"; then
     echo "$RTC_PARAM" | sudo tee -a "$CONFIG_FILE" > /dev/null
@@ -86,7 +84,7 @@ After=network.target
 
 [Service]
 ExecStart=/usr/bin/python3 $PYTHON_SCRIPT
-WorkingDirectory=$HOME_DIR
+WorkingDirectory=$CIAP_DIR
 Restart=always
 User=${USER_NAME}
 
