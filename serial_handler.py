@@ -38,10 +38,7 @@ class SerialManager:
     def _generate_log_path(self):
         user = getpass.getuser()
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        if self.imei:
-            filename = f"{user}_{self.imei}_{timestamp}.log"
-        else:
-            filename = f"serial_log_{user}_{timestamp}.log"
+        filename = f"serial_log_{self.imei}_{user}_{timestamp}.log"
         return os.path.join(self._get_log_folder(), filename)
 
     def _prepare_fallback_log(self):
@@ -125,7 +122,7 @@ class SerialManager:
             self.serial_port.write((command + '\n').encode())
 
     def detect_and_send_imei_command(self):
-        commands = ["*GET,IMEI#", "CMN *GET#IMEI#", "*GET#IMEI#"]
+        commands = ["*GET#IMEI#","*GET,IMEI#", "CMN *GET#IMEI#" ]
         for i, cmd in enumerate(commands):
             self.ui.root.after(i * 2000, lambda c=cmd: self.send_command(c))
         self.ui.root.after(7000, lambda: setattr(self, 'detecting_imei', False))
