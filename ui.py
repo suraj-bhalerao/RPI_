@@ -11,7 +11,7 @@ class UI:
     def __init__(self, root):
         self.root = root
         self.root.title("AEPL Logger (Disconnected)")
-        self.root.geometry("850x700")
+        self.root.geometry("800x600")
 
         try:
             if sys.platform.startswith("win"):

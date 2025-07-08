@@ -7,7 +7,7 @@ import re
 import queue
 import platform
 
-## Name added here - Suraj Bhalerao
+
 class SerialManager:
     def __init__(self, ui):
         self.ui = ui
@@ -48,34 +48,50 @@ class SerialManager:
 
     def auto_monitor_ports(self):
         known_ports = set()
+        last_good_port = None
+
         while True:
             try:
                 current_ports = set(p.device for p in serial.tools.list_ports.comports())
                 lost_ports = known_ports - current_ports
 
+                # Handle disconnect
                 if lost_ports and self.serial_port and self.serial_port.port in lost_ports:
                     self.ui.root.title("AEPL Logger (Disconnected)")
                     self.stop_logging()
                     self.serial_port = None
 
+                # Try reconnecting
                 if not self.serial_port or not (self.serial_port.is_open and self.logging_active):
-                    for port in current_ports:
+                    ports_to_check = list(current_ports)
+                    if last_good_port in ports_to_check:
+                        ports_to_check.remove(last_good_port)
+                        ports_to_check.insert(0, last_good_port)
+
+                    for port in ports_to_check:
                         try:
-                            temp_port = serial.Serial(port, baudrate=115200, timeout=0.1)
+                            temp_port = serial.Serial(port, baudrate=115200, timeout=0.05)
                             data_found = False
                             start_time = time.time()
-                            while time.time() - start_time < 0.1:
-                                if temp_port.in_waiting > 0:
+
+                            while time.time() - start_time < 0.15:
+                                if temp_port.in_waiting:
                                     data = temp_port.read(temp_port.in_waiting)
                                     if data:
                                         data_found = True
                                         break
-                                time.sleep(0.005)
+                                else:
+                                    data = temp_port.read(32)
+                                    if data:
+                                        data_found = True
+                                        break
+                                time.sleep(0.01)
 
                             if data_found:
                                 if self.serial_port and self.serial_port.is_open:
                                     self.serial_port.close()
                                 self.serial_port = temp_port
+                                last_good_port = port
                                 self.ui.root.title(f"AEPL Logger (Connected: {port})")
                                 self.start_logging()
                                 break
@@ -85,7 +101,7 @@ class SerialManager:
                             self.log_queue.put(f"Could not open {port}: {e}")
 
                 known_ports = current_ports
-                time.sleep(0.05)
+                time.sleep(0.05)  # Balanced delay
             except Exception as e:
                 self.log_queue.put(f"Port monitor error: {e}")
 

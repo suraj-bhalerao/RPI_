@@ -1,0 +1,8 @@
+*GET#TDPS#
+pause 10
+ 
+*GET#CIP3#
+pause 10
+ 
+*GET#DEVNWSW#
+pause 10
