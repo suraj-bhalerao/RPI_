@@ -4,3 +4,4 @@ logs
 build
 dist
 Trash
+*.vscode
