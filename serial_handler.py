@@ -1,3 +1,4 @@
+from click import command
 import serial
 import threading
 import time
@@ -7,6 +8,7 @@ import re
 import queue
 import platform
 from datetime import datetime
+from ota_validator import OTAValidator
 
 
 class SerialManager:
@@ -21,6 +23,10 @@ class SerialManager:
         self.buffered_lines = []
         self.imei = None
         self.detecting_imei = False
+
+        self.ota_validator = OTAValidator(self)
+        self.recent_lines = []
+        self.recent_lines_lock = threading.Lock()
 
         self.monitor_thread = threading.Thread(
             target=self.auto_monitor_ports, daemon=True
@@ -62,7 +68,6 @@ class SerialManager:
                 )
                 lost_ports = known_ports - current_ports
 
-                # Handle disconnect
                 if (
                     lost_ports
                     and self.serial_port
@@ -72,7 +77,6 @@ class SerialManager:
                     self.stop_logging()
                     self.serial_port = None
 
-                # Try reconnecting
                 if not self.serial_port or not (
                     self.serial_port.is_open and self.logging_active
                 ):
@@ -116,7 +120,7 @@ class SerialManager:
                             self.log_queue.put(f"Could not open {port}: {e}")
 
                 known_ports = current_ports
-                time.sleep(0.05)  # Balanced delay
+                time.sleep(0.05)
             except Exception as e:
                 self.log_queue.put(f"Port monitor error: {e}")
 
@@ -129,6 +133,9 @@ class SerialManager:
         self.thread = threading.Thread(target=self.read_serial, daemon=True)
         self.thread.start()
         self.detect_and_send_imei_command()
+
+        if self.ota_validator:
+            self.ota_validator.start_validation_after_delay(20)
 
     def stop_logging(self):
         self.logging_active = False
@@ -152,6 +159,10 @@ class SerialManager:
     def send_command(self, command):
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.write((command + "\n").encode())
+            self.log_queue.put(f"[TX] {command}")
+
+    def write(self, command):
+        self.send_command(command)
 
     def detect_and_send_imei_command(self):
         commands = ["*GET#IMEI#", "*GET,IMEI#", "CMN *GET#IMEI#"]
@@ -197,7 +208,6 @@ class SerialManager:
                                     encoding="utf-8",
                                     errors="ignore",
                                 )
-                                # self.log_queue.put(f"IMEI Detected: {self.imei}")
 
                                 for buffered in self.buffered_lines:
                                     if buffered.rstrip():
@@ -235,6 +245,10 @@ class SerialManager:
                             self.fallback_log_file.flush()
 
                         self.log_queue.put(clean_line)
+                        with self.recent_lines_lock:
+                            self.recent_lines.append(clean_line)
+                            if len(self.recent_lines) > 100:
+                                self.recent_lines.pop(0)
 
             except Exception as e:
                 self.log_queue.put(f"Error: {e}")
@@ -246,3 +260,7 @@ class SerialManager:
             message = self.log_queue.get_nowait()
             self.ui.insert_log(message)
         self.ui.root.after(50, self.process_log_queue)
+
+    def get_recent_lines(self):
+        with self.recent_lines_lock:
+            return list(self.recent_lines)

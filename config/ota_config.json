@@ -1,0 +1,50 @@
+{
+    "uin_commands": ["*GET,UIN#", "*GET#UIN#", "CMN *GET#UIN#"],
+    "timeout": 10,
+    "retries": 2,
+    "device_profiles": {
+      "TCU 4G": {
+        "*GET#TDPS#": {
+          "expected": "STATUS#TDPS#1#",
+          "set_command": "*SET#TDPS#1#"
+        },
+        "*GET#CIP3#": {
+          "expected": "STATUS#CIP3#tmlcvpdpdsqa01.inservices.tatamotors.com#9993#",
+          "set_command": "*SET#CIP3#tmlcvpdpdsqa01.inservices.tatamotors.com#9993#"
+        },
+        "*GET#DEVNWSW#": {
+          "expected": "STATUS#DEVNWSW#1#",
+          "set_command": "*SET#DEVNWSW#1#"
+        }
+      },
+      "TCU 2G": {
+        "CMN *GET#TDPS#": {
+          "expected": "STATUS#TDPS#1#",
+          "set_command": "CMN *SET#TDPS#1#"
+        },
+        "CMN *GET#CIP3#": {
+          "expected": "STATUS#CIP3#tmlcvpdpdsqa01.inservices.tatamotors.com#9993#",
+          "set_command": "CMN *SET#CIP3#tmlcvpdpdsqa01.inservices.tatamotors.com#9993#"
+        },
+        "CMN *GET#DEVNWSW#": {
+          "expected": "STATUS#DEVNWSW#1#",
+          "set_command": "CMN *SET#DEVNWSW#1#"
+        }
+      },
+      "Sampark": {
+        "*GET#TDPS#": {
+          "expected": "STATUS#TDPS#1#",
+          "set_command": "*SET#TDPS#1#"
+        },
+        "*GET#CIP3#": {
+          "expected": "STATUS#CIP3#tmlcvpdpdsqa01.inservices.tatamotors.com#9993#",
+          "set_command": "*SET#CIP3#tmlcvpdpdsqa01.inservices.tatamotors.com#9993#"
+        },
+        "*GET#DEVNWSW#": {
+          "expected": "STATUS#DEVNWSW#1#",
+          "set_command": "*SET#DEVNWSW#1#"
+        }
+      }
+    }
+  }
+  

@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import scrolledtext, filedialog, messagebox, PhotoImage
+from tkinter import scrolledtext, messagebox, PhotoImage
 from serial_handler import SerialManager
 from macro_executor import MacroExecutor
+from ota_validator import OTAValidator
 import re
 import sys
 
@@ -41,6 +42,8 @@ class UI:
             self.log_console.tag_configure(tag.lower(), foreground=color)
 
         self.serial_manager = SerialManager(self)
+        self.ota_validator = OTAValidator(self.serial_manager)
+        self.ota_validator.start_validation_after_delay(20)
         self.macro_executor = MacroExecutor(self)
 
         self.create_menu()
