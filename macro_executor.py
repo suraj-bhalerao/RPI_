@@ -11,10 +11,10 @@ class MacroExecutor:
 
     def load_validation_file(self):
         try:
-            with open("Assets/ota_validation.json", "r") as f:
+            with open("Assets/device.json", "r") as f:
                 return json.load(f)
         except Exception as e:
-            messagebox.showerror("Validation Config Error", f"Could not load OTA validation file.\n{e}")
+            messagebox.showerror("Validation Config Error", f"Could not load device validation file.\n{e}")
             return {}
 
     def load_and_run(self):
