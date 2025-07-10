@@ -5,6 +5,7 @@ from macro_executor import MacroExecutor
 import re
 import sys
 
+
 class UI:
     dev_name = "Suraj Bhalerao"
 
@@ -22,13 +23,19 @@ class UI:
         except Exception as e:
             print(f"Error setting icon: {e}")
 
-        self.log_console = scrolledtext.ScrolledText(self.root, wrap=tk.NONE, bg="black", fg="white", font=("Consolas", 10))
+        self.log_console = scrolledtext.ScrolledText(
+            self.root, wrap=tk.NONE, bg="black", fg="white", font=("Consolas", 10)
+        )
         self.log_console.pack(expand=True, fill=tk.BOTH)
         self.log_console.bind("<KeyPress>", self.block_typing_during_logging)
 
         self.color_tags = {
-            'AIS': '#0039a6', 'CVP': 'blue', 'CAN': 'magenta',
-            'NET': 'green', 'PLA': 'yellow', 'FOT': 'magenta'
+            "AIS": "#0039a6",
+            "CVP": "blue",
+            "CAN": "magenta",
+            "NET": "green",
+            "PLA": "yellow",
+            "FOT": "magenta",
         }
         for tag, color in self.color_tags.items():
             self.log_console.tag_configure(tag.lower(), foreground=color)
@@ -48,10 +55,9 @@ class UI:
         self.log_console.bind("<Control-v>", self.paste_text)
         self.log_console.bind("<Control-a>", self.select_all)
 
-        self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)         
-        self.log_console.bind("<Button-4>", self.on_mouse_scroll_linux_up)  
+        self.log_console.bind("<MouseWheel>", self.on_mouse_scroll)
+        self.log_console.bind("<Button-4>", self.on_mouse_scroll_linux_up)
         self.log_console.bind("<Button-5>", self.on_mouse_scroll_linux_down)
-
 
         self.user_scrolled = False
 
@@ -59,23 +65,39 @@ class UI:
         menu_bar = tk.Menu(self.root)
 
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Start Logging", command=self.serial_manager.start_logging, accelerator="Ctrl+L")
-        file_menu.add_command(label="Stop Logging", command=self.serial_manager.stop_logging, accelerator="Ctrl+Q")
+        file_menu.add_command(
+            label="Start Logging",
+            command=self.serial_manager.start_logging,
+            accelerator="Ctrl+L",
+        )
+        file_menu.add_command(
+            label="Stop Logging",
+            command=self.serial_manager.stop_logging,
+            accelerator="Ctrl+Q",
+        )
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit, accelerator="Alt+Q")
         menu_bar.add_cascade(label="File", menu=file_menu)
 
         edit_menu = tk.Menu(menu_bar, tearoff=0)
-        edit_menu.add_command(label="Copy", command=self.copy_text, accelerator="Ctrl+C")
-        edit_menu.add_command(label="Paste", command=self.paste_text, accelerator="Ctrl+V")
+        edit_menu.add_command(
+            label="Copy", command=self.copy_text, accelerator="Ctrl+C"
+        )
+        edit_menu.add_command(
+            label="Paste", command=self.paste_text, accelerator="Ctrl+V"
+        )
         menu_bar.add_cascade(label="Edit", menu=edit_menu)
 
         macro_menu = tk.Menu(menu_bar, tearoff=0)
-        macro_menu.add_command(label="Run Macro", command=self.macro_executor.load_and_run)
+        macro_menu.add_command(
+            label="Run Macro", command=self.macro_executor.load_and_run
+        )
         menu_bar.add_cascade(label="Macros", menu=macro_menu)
 
         window_menu = tk.Menu(menu_bar, tearoff=0)
-        window_menu.add_command(label="Minimize", command=self.root.iconify, accelerator="Ctrl+M")
+        window_menu.add_command(
+            label="Minimize", command=self.root.iconify, accelerator="Ctrl+M"
+        )
         window_menu.add_command(label="Maximize", command=self.maximize_window)
         menu_bar.add_cascade(label="Window", menu=window_menu)
 
@@ -86,7 +108,7 @@ class UI:
         self.root.config(menu=menu_bar)
 
     def insert_log(self, message):
-        split_lines = re.split(r'(?<!\n)[|+](?=\w)', message)
+        split_lines = re.split(r"(?<!\n)[|+](?=\w)", message)
 
         for line in split_lines:
             line = line.strip()
@@ -122,10 +144,13 @@ class UI:
             self.log_console.insert(tk.END, clipboard + "\n")
             self.log_console.yview(tk.END)
 
-            if self.serial_manager.serial_port and self.serial_manager.serial_port.is_open:
+            if (
+                self.serial_manager.serial_port
+                and self.serial_manager.serial_port.is_open
+            ):
                 for line in clipboard.strip().splitlines():
-                    if line.startswith('*'):
-                        self.serial_manager.serial_port.write((line + '\n').encode())
+                    if line.startswith("*"):
+                        self.serial_manager.serial_port.write((line + "\n").encode())
                         self.insert_log(f"{line}")
         except tk.TclError:
             messagebox.showwarning("Paste", "Clipboard is empty or cannot be accessed.")
@@ -144,25 +169,28 @@ class UI:
 
     def at_bottom(self):
         return self.log_console.yview()[1] == 1.0
-    
+
     def on_mouse_scroll_linux_up(self, event):
-        self.log_console.yview_scroll(-1, "units")  
+        self.log_console.yview_scroll(-1, "units")
         self.user_scrolled = not self.at_bottom()
         return "break"
 
     def on_mouse_scroll_linux_down(self, event):
-        self.log_console.yview_scroll(1, "units")   
+        self.log_console.yview_scroll(1, "units")
         self.user_scrolled = not self.at_bottom()
         return "break"
 
     def maximize_window(self):
-        self.root.state('zoomed')
+        self.root.state("zoomed")
 
     def show_about(self):
-        messagebox.showinfo(f"About", f"AEPL Logger\nVersion 2.0\n\nDeveloped by {self.dev_name}\n\nThis application logs and manages AEPL data.")
+        messagebox.showinfo(
+            f"About",
+            f"AEPL Logger\nVersion 2.0\n\nDeveloped by {self.dev_name}\n\nThis application logs and manages AEPL data.",
+        )
 
     def block_typing_during_logging(self, event):
         if self.serial_manager.logging_active:
-            if event.state & 0x0004 or event.keysym in ['space', 'Return']:
+            if event.state & 0x0004 or event.keysym in ["space", "Return"]:
                 return None
             return "break"
