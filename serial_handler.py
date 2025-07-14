@@ -1,12 +1,11 @@
-from click import command
-import serial
-import threading
-import time
-import serial.tools.list_ports
 import os
 import re
+import time
 import queue
+import serial
 import platform
+import threading
+import serial.tools.list_ports
 from datetime import datetime
 from ota_validator import OTAValidator
 
@@ -15,35 +14,35 @@ class SerialManager:
     def __init__(self, ui):
         self.ui = ui
         self.serial_port = None
-        self.thread = None
+        self.read_thread = None
+        self.monitor_thread = threading.Thread(target=self.auto_monitor_ports, daemon=True)
         self.logging_active = False
+
         self.log_queue = queue.Queue()
         self.log_file = None
         self.fallback_log_file = None
         self.buffered_lines = []
+
         self.imei = None
         self.detecting_imei = False
+        self.imei_commands = ["*GET#IMEI#", "*GET,IMEI#", "CMN *GET#IMEI#"]
+        self.current_imei_index = 0
 
-        self.ota_validator = OTAValidator(self)
         self.recent_lines = []
         self.recent_lines_lock = threading.Lock()
+        self.ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+        self.imei_pattern = re.compile(r"IMEI[:#\s]*(\d{14,17})", re.IGNORECASE)
 
-        self.monitor_thread = threading.Thread(
-            target=self.auto_monitor_ports, daemon=True
-        )
+        self.ota_validator = OTAValidator(self)
+
+        os.makedirs("logs", exist_ok=True)
         self.monitor_thread.start()
-
-        if not os.path.exists("logs"):
-            os.makedirs("logs")
-
         self.ui.root.after(50, self.process_log_queue)
 
     def _get_log_folder(self):
-        date_str = time.strftime("%Y-%m-%d")
-        folder_path = os.path.join("logs", date_str)
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-        return folder_path
+        folder = os.path.join("logs", time.strftime("%Y-%m-%d"))
+        os.makedirs(folder, exist_ok=True)
+        return folder
 
     def _generate_log_path(self):
         user = platform.node()
@@ -52,10 +51,8 @@ class SerialManager:
         return os.path.join(self._get_log_folder(), filename)
 
     def _prepare_fallback_log(self):
-        fallback_path = os.path.join(self._get_log_folder(), "default.log")
-        self.fallback_log_file = open(
-            fallback_path, "a", encoding="utf-8", errors="ignore"
-        )
+        path = os.path.join(self._get_log_folder(), "default.log")
+        self.fallback_log_file = open(path, "a", encoding="utf-8", errors="ignore")
 
     def auto_monitor_ports(self):
         known_ports = set()
@@ -63,23 +60,15 @@ class SerialManager:
 
         while True:
             try:
-                current_ports = set(
-                    p.device for p in serial.tools.list_ports.comports()
-                )
+                current_ports = set(p.device for p in serial.tools.list_ports.comports())
                 lost_ports = known_ports - current_ports
 
-                if (
-                    lost_ports
-                    and self.serial_port
-                    and self.serial_port.port in lost_ports
-                ):
+                if self.serial_port and self.serial_port.port in lost_ports:
                     self.ui.root.title("AEPL Logger (Disconnected)")
                     self.stop_logging()
                     self.serial_port = None
 
-                if not self.serial_port or not (
-                    self.serial_port.is_open and self.logging_active
-                ):
+                if not self.serial_port or not (self.serial_port.is_open and self.logging_active):
                     ports_to_check = list(current_ports)
                     if last_good_port in ports_to_check:
                         ports_to_check.remove(last_good_port)
@@ -87,24 +76,8 @@ class SerialManager:
 
                     for port in ports_to_check:
                         try:
-                            temp_port = serial.Serial(
-                                port, baudrate=115200, timeout=0.05
-                            )
-                            data_found = False
-                            start_time = time.time()
-
-                            while time.time() - start_time < 0.15:
-                                if temp_port.in_waiting:
-                                    data = temp_port.read(temp_port.in_waiting)
-                                    if data:
-                                        data_found = True
-                                        break
-                                else:
-                                    data = temp_port.read(32)
-                                    if data:
-                                        data_found = True
-                                        break
-                                time.sleep(0.01)
+                            temp_port = serial.Serial(port, baudrate=115200, timeout=0.05)
+                            data_found = self._port_has_data(temp_port)
 
                             if data_found:
                                 if self.serial_port and self.serial_port.is_open:
@@ -116,7 +89,7 @@ class SerialManager:
                                 break
                             else:
                                 temp_port.close()
-                        except (serial.SerialException, PermissionError) as e:
+                        except Exception as e:
                             self.log_queue.put(f"Could not open {port}: {e}")
 
                 known_ports = current_ports
@@ -124,15 +97,25 @@ class SerialManager:
             except Exception as e:
                 self.log_queue.put(f"Port monitor error: {e}")
 
+    def _port_has_data(self, port):
+        start_time = time.time()
+        while time.time() - start_time < 0.15:
+            if port.in_waiting:
+                return True
+            if port.read(32):
+                return True
+            time.sleep(0.01)
+        return False
+
     def start_logging(self):
         if not self.serial_port or self.logging_active:
             return
 
         self.logging_active = True
         self.detecting_imei = True
-        self.thread = threading.Thread(target=self.read_serial, daemon=True)
-        self.thread.start()
-        self.detect_and_send_imei_command()
+        self.read_thread = threading.Thread(target=self.read_serial, daemon=True)
+        self.read_thread.start()
+        self.try_next_imei_command()
 
         if self.ota_validator:
             self.ota_validator.start_validation_after_delay(20)
@@ -141,18 +124,13 @@ class SerialManager:
         self.logging_active = False
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.close()
-        if self.log_file:
+        for f in [self.log_file, self.fallback_log_file]:
             try:
-                self.log_file.close()
+                if f:
+                    f.close()
             except:
                 pass
-            self.log_file = None
-        if self.fallback_log_file:
-            try:
-                self.fallback_log_file.close()
-            except:
-                pass
-            self.fallback_log_file = None
+        self.log_file = self.fallback_log_file = None
         self.buffered_lines.clear()
         self.log_queue.put("Logging stopped.")
 
@@ -161,106 +139,90 @@ class SerialManager:
             self.serial_port.write((command + "\n").encode())
             self.log_queue.put(f"[TX] {command}")
 
-    def write(self, command):
-        self.send_command(command)
+    def try_next_imei_command(self):
+        if not self.detecting_imei or self.imei is not None:
+            return
 
-    def detect_and_send_imei_command(self):
-        commands = ["*GET#IMEI#", "*GET,IMEI#", "CMN *GET#IMEI#"]
-        for i, cmd in enumerate(commands):
-            self.ui.root.after(i * 2000, lambda c=cmd: self.send_command(c))
-        self.ui.root.after(7000, lambda: setattr(self, "detecting_imei", False))
+        if self.current_imei_index >= len(self.imei_commands):
+            self.detecting_imei = False
+            return
+
+        command = self.imei_commands[self.current_imei_index]
+        self.current_imei_index += 1
+        self.send_command(command)
+        self.ui.root.after(2000, self.try_next_imei_command)
 
     def read_serial(self):
-        ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
-        imei_pattern = re.compile(r"IMEI[:#\s]*(\d{14,17})", re.IGNORECASE)
-
         buffer = ""
 
         while self.logging_active:
             try:
                 if self.serial_port.in_waiting:
-                    raw_data = self.serial_port.read(
-                        self.serial_port.in_waiting
-                    ).decode("utf-8", errors="ignore")
-                    buffer += raw_data
-                    lines = buffer.splitlines(keepends=False)
-                    if raw_data and not raw_data.endswith("\n"):
-                        buffer = lines.pop() if lines else buffer
-                    else:
-                        buffer = ""
+                    raw = self.serial_port.read(self.serial_port.in_waiting).decode("utf-8", errors="ignore")
+                    buffer += raw
+                    lines = buffer.splitlines()
+                    buffer = "" if raw.endswith("\n") else lines.pop() if lines else buffer
 
                     for line in lines:
-                        clean_line = ansi_escape.sub("", line).rstrip()
-                        if not clean_line:
-                            continue
-
-                        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-
-                        if self.detecting_imei and self.imei is None:
-                            self.buffered_lines.append(clean_line)
-                            match = imei_pattern.search(clean_line)
-                            if match:
-                                self.imei = match.group(1)
-                                self.detecting_imei = False
-                                self.log_file = open(
-                                    self._generate_log_path(),
-                                    "a",
-                                    encoding="utf-8",
-                                    errors="ignore",
-                                )
-
-                                for buffered in self.buffered_lines:
-                                    if buffered.rstrip():
-                                        self.log_file.write(
-                                            f"{timestamp} - {buffered.strip()}\n"
-                                        )
-
-                                self.log_file.flush()
-                                self.buffered_lines.clear()
-
-                                if self.fallback_log_file:
-                                    try:
-                                        self.fallback_log_file.close()
-                                        fallback_path = os.path.join(
-                                            self._get_log_folder(), "default.log"
-                                        )
-                                        if os.path.exists(fallback_path):
-                                            os.remove(fallback_path)
-                                    except Exception as e:
-                                        self.log_queue.put(
-                                            f"Error deleting fallback log: {e}"
-                                        )
-                                    finally:
-                                        self.fallback_log_file = None
-
-                        if self.imei and self.log_file:
-                            self.log_file.write(f"{timestamp} - {clean_line}\n")
-                            self.log_file.flush()
-                        else:
-                            if not self.fallback_log_file:
-                                self._prepare_fallback_log()
-                            self.fallback_log_file.write(
-                                f"{timestamp} - {clean_line}\n"
-                            )
-                            self.fallback_log_file.flush()
-
-                        self.log_queue.put(clean_line)
-                        with self.recent_lines_lock:
-                            self.recent_lines.append(clean_line)
-                            if len(self.recent_lines) > 100:
-                                self.recent_lines.pop(0)
-
+                        self.handle_line(self.ansi_escape.sub("", line).strip())
             except Exception as e:
                 self.log_queue.put(f"Error: {e}")
                 break
             time.sleep(0.01)
 
+    def handle_line(self, line):
+        if not line:
+            return
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+        if self.detecting_imei and self.imei is None:
+            self.buffered_lines.append(line)
+            match = self.imei_pattern.search(line)
+            if match:
+                self.imei = match.group(1)
+                self.detecting_imei = False
+                self._finalize_imei_detection(timestamp)
+
+        if self.imei and self.log_file:
+            self.log_file.write(f"{timestamp} - {line}\n")
+            self.log_file.flush()
+        else:
+            if not self.fallback_log_file:
+                self._prepare_fallback_log()
+            self.fallback_log_file.write(f"{timestamp} - {line}\n")
+            self.fallback_log_file.flush()
+
+        self.log_queue.put(line)
+        with self.recent_lines_lock:
+            self.recent_lines.append(line)
+            if len(self.recent_lines) > 100:
+                self.recent_lines.pop(0)
+
+    def _finalize_imei_detection(self, timestamp):
+        self.log_file = open(self._generate_log_path(), "a", encoding="utf-8", errors="ignore")
+        for line in self.buffered_lines:
+            if line.strip():
+                self.log_file.write(f"{timestamp} - {line.strip()}\n")
+        self.log_file.flush()
+        self.buffered_lines.clear()
+
+        if self.fallback_log_file:
+            try:
+                self.fallback_log_file.close()
+                os.remove(os.path.join(self._get_log_folder(), "default.log"))
+            except Exception as e:
+                self.log_queue.put(f"Error deleting fallback log: {e}")
+            self.fallback_log_file = None
+
     def process_log_queue(self):
         while not self.log_queue.empty():
-            message = self.log_queue.get_nowait()
-            self.ui.insert_log(message)
+            self.ui.insert_log(self.log_queue.get_nowait())
         self.ui.root.after(50, self.process_log_queue)
 
-    def get_recent_lines(self):
+    def get_recent_lines(self, clear_after_read=False):
         with self.recent_lines_lock:
-            return list(self.recent_lines)
+            lines = list(self.recent_lines)
+            if clear_after_read:
+                self.recent_lines.clear()
+            return lines

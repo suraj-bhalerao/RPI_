@@ -1,96 +1,112 @@
 import json
-import time
 import threading
-import re
+import time
+import logging
 
 
 class OTAValidator:
     def __init__(self, serial_manager):
         self.serial_manager = serial_manager
-        self.ota_config = self.load_ota_config()
-        self.uin_commands = self.ota_config.get("uin_commands", [])
-        self.timeout = self.ota_config.get("timeout", 10)
-        self.retries = self.ota_config.get("retries", 2)
-        self.device_profiles = self.ota_config.get("device_profiles", {})
+        self.config = self.load_config()
+        self.uin = None
+        self.logger = logging.getLogger("OTAValidator")
 
-    def load_ota_config(self):
-        with open("./config/ota_config.json", "r") as f:
-            return json.load(f)
+    def load_config(self):
+        try:
+            with open("./config/ota_config.json", "r") as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.error(f"Failed to load config: {e}")
+            return {}
 
-    def start_validation_after_delay(self, delay=50):
-        threading.Thread(target=self._delayed_start, args=(delay,), daemon=True).start()
+    def start_validation_after_delay(self, delay_seconds):
+        threading.Thread(target=self._delayed_start, args=(delay_seconds,), daemon=True).start()
 
-    def _delayed_start(self, delay):
-        print(f"[INFO] Waiting {delay}s before OTA validation...")
-        time.sleep(delay)
+    def _delayed_start(self, delay_seconds):
+        self.logger.info(f"Waiting {delay_seconds}s before OTA validation...")
+        time.sleep(delay_seconds)
         self.validate_device()
 
-    def send_and_wait_response(self, command, keyword=None, timeout=None):
-        timeout = timeout or self.timeout
-        self.serial_manager.send_command(command)
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            lines = self.serial_manager.get_recent_lines()
-            for line in reversed(lines):
-                if keyword and keyword in line:
-                    return line
-                elif not keyword:
-                    return line
-            time.sleep(0.2)
-        return None
-
-    def extract_device_type(self, uin_line):
-        match = re.search(r"ACON4(..)", uin_line)
-        if match:
-            code = match.group(1)
-            if code == "NA":
-                return "TCU 2G"
-            elif code == "IA":
-                return "TCU 4G"
-            elif code == "CA":
-                return "Sampark"
-        return None
-
     def validate_device(self):
-        print("[INFO] Starting UIN detection...")
-
-        uin_line = None
-        for attempt in range(self.retries):
-            for cmd in self.uin_commands:
-                print(f"[INFO] Attempt {attempt+1}: Sending UIN command: {cmd}")
-                uin_line = self.send_and_wait_response(cmd, keyword="ACON4")
-                if uin_line:
-                    break
-            if uin_line:
-                break
-
-        if not uin_line:
-            print("[ERROR] UIN response not received after all retries.")
+        uin = self.detect_uin()
+        if not uin:
+            self.logger.warning("UIN detection failed.")
             return
 
-        device_type = self.extract_device_type(uin_line)
-        if not device_type:
-            print("[ERROR] Could not identify device type from UIN line.")
+        self.uin = uin
+        profile = self.config.get("device_profiles", {}).get("TCU 4G")  # Hardcoded for now
+
+        if not profile:
+            self.logger.warning("No profile found for TCU 4G.")
             return
 
-        print(f"[INFO] Detected device type: {device_type}")
+        for get_cmd, params in profile.items():
+            expected = params.get("expected")
+            set_cmd = params.get("set_command")
+            set_expected = params.get("set_expected")
 
-        device_config = self.device_profiles.get(device_type)
-        if not device_config:
-            print(f"[ERROR] No OTA config found for device: {device_type}")
-            return
+            success = self.attempt_get_and_validate(get_cmd, expected)
+            if success:
+                continue
 
-        for get_cmd, data in device_config.items():
-            expected = data["expected"]
-            set_cmd = data["set_command"]
-            keyword = expected.split("#")[1] if "#" in expected else None
+            if set_cmd and set_expected:
+                self.logger.info(f"Sending SET command: {set_cmd}")
+                if self.send_and_validate(set_cmd, set_expected):
+                    self.logger.info(f"Successfully applied setting via: {set_cmd}")
+                else:
+                    self.logger.warning(f"SET failed for: {set_cmd}")
 
-            print(f"[INFO] Sending GET command: {get_cmd}")
-            response = self.send_and_wait_response(get_cmd, keyword=keyword)
+    def detect_uin(self):
+        for cmd in self.config.get("uin_commands", []):
+            for attempt in range(self.config.get("retries", 2)):
+                self.logger.info(f"Attempt {attempt + 1}: Sending UIN command: {cmd}")
+                self.serial_manager.send_command(cmd)
+                lines = self.wait_for_response(keyword="STATUS#UIN#", timeout=self.config.get("timeout", 10))
+                for line in lines:
+                    if "STATUS#UIN#" in line:
+                        uin = line.split("STATUS#UIN#")[-1].strip("# \r\n")
+                        self.logger.info(f"Detected UIN: {uin}")
+                        return uin
+                time.sleep(1)
+        return None
 
-            if response and expected in response:
-                print(f"[OK] Validated: {get_cmd}")
+    def attempt_get_and_validate(self, command, expected_value):
+        retries = self.config.get("retries", 2)
+        for attempt in range(retries):
+            self.logger.info(f"[Attempt {attempt + 1}] Sending GET command: {command}")
+            self.serial_manager.send_command(command)
+            lines = self.wait_for_response(expected_value, timeout=self.config.get("timeout", 10))
+            if any(expected_value in line for line in lines):
+                self.logger.info(f"[OK] {command} returned expected value.")
+                return True
+            time.sleep(1)
+        return False
+
+    def send_and_validate(self, command, expected_response):
+        self.logger.info(f"[SET] Sending command: {command}")
+        self.serial_manager.send_command(command)
+        lines = self.wait_for_response(expected_response, timeout=self.config.get("timeout", 10))
+        if any(expected_response in line for line in lines):
+            self.logger.info(f"[SET OK] Confirmed: {expected_response}")
+            return True
+        else:
+            self.logger.warning(f"[SET FAIL] No matching response for: {expected_response}")
+        return False
+
+    def wait_for_response(self, keyword=None, timeout=10):
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            lines = self.serial_manager.get_recent_lines(clear_after_read=False)
+            if keyword:
+                for line in lines:
+                    if keyword in line:
+                        # Clear only if we get what we want
+                        self.serial_manager.get_recent_lines(clear_after_read=True)
+                        return [line]
             else:
-                print(f"[FIX] Sending SET for: {get_cmd}")
-                self.serial_manager.send_command(set_cmd)
+                if lines:
+                    self.serial_manager.get_recent_lines(clear_after_read=True)
+                    return lines
+            time.sleep(0.3)
+        return []
+
