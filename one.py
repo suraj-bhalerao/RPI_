@@ -12,7 +12,7 @@ UPLOADED_LOGS_FILE = f"{BASE_LOG_DIR}/uploaded_logs.txt"
 def is_connected_to_wifi():
     try:
         ssid = subprocess.check_output(['iwgetid', '-r']).decode().strip()
-        if ssid == False:
+        if ssid:
             print(f"Connected to network: {ssid}")
             return True
         else:

@@ -224,13 +224,13 @@ class SerialManager:
                                         self.fallback_log_file = None
 
                         if self.imei and self.log_file:
-                            self.log_file.write(f"{timestamp} - {clean_line}\n")
+                            self.log_file.write(f"[{timestamp}] - {clean_line}\n")
                             self.log_file.flush()
                         else:
                             if not self.fallback_log_file:
                                 self._prepare_fallback_log()
                             self.fallback_log_file.write(
-                                f"{timestamp} - {clean_line}\n"
+                                f"[{timestamp}] - {clean_line}\n"
                             )
                             self.fallback_log_file.flush()
 
