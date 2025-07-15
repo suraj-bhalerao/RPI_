@@ -137,7 +137,7 @@ class SerialManager:
     def send_command(self, command):
         if self.serial_port and self.serial_port.is_open:
             self.serial_port.write((command + "\n").encode())
-            self.log_queue.put(f"[TX] {command}")
+            # self.log_queue.put(f"[TX] {command}")
 
     def try_next_imei_command(self):
         if not self.detecting_imei or self.imei is not None:
