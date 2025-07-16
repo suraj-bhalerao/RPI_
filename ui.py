@@ -186,7 +186,7 @@ class UI:
     def show_about(self):
         messagebox.showinfo(
             f"About",
-            f"AEPL Logger\nVersion 3.0\n\nDeveloped by - {self.dev_name} with '❤️' \n\nThis application logs and manages AEPL data.",
+            f"AEPL Logger\nVersion 3.0\n\nDeveloped by - {self.dev_name} \n\nThis application logs and manages AEPL data.",
         )
 
     def block_typing_during_logging(self, event):
