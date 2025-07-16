@@ -30,13 +30,13 @@ class UI:
         self.log_console.bind("<KeyPress>", self.block_typing_during_logging)
 
         self.color_tags = {
-            "AIS": "#0039a6",
-            "CVP": "blue",
-            "CAN": "magenta",
-            "NET": "green",
-            "PLA": "yellow",
-            "FOT": "magenta",
-        }
+        "AIS": "#0039a6",  # Deep blue
+        "CVP": "#0000ff",  # Blue
+        "CAN": "#ff00ff",  # Magenta
+        "NET": "#008000",  # Green
+        "PLA": "#ffff00",  # Yellow
+        "FOT": "#bd309f",  # Magenta 
+    }
         for tag, color in self.color_tags.items():
             self.log_console.tag_configure(tag.lower(), foreground=color)
 
