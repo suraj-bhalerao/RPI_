@@ -202,7 +202,7 @@ class SerialManager:
                                 for buffered in self.buffered_lines:
                                     if buffered.rstrip():
                                         self.log_file.write(
-                                            f"{timestamp} - {buffered.strip()}\n"
+                                            f"[{timestamp}] - {buffered.strip()}\n"
                                         )
 
                                 self.log_file.flush()
