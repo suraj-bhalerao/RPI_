@@ -43,7 +43,7 @@ class OTAValidator:
         for get_cmd, params in profile.items():
             expected = params.get("expected")
             set_cmd = params.get("set_command")
-            set_expected = params.get("set_expected")
+            set_expected = params.get("set_expected")  ## why this ?
 
             success = self.attempt_get_and_validate(get_cmd, expected)
             if success:
@@ -58,7 +58,7 @@ class OTAValidator:
 
     def detect_uin(self):
         for cmd in self.config.get("uin_commands", []):
-            for attempt in range(self.config.get("retries", 2)):
+            for attempt in range(self.config.get("retries", 1)):
                 self.logger.info(f"Attempt {attempt + 1}: Sending UIN command: {cmd}")
                 self.serial_manager.send_command(cmd)
                 lines = self.wait_for_response(keyword="STATUS#UIN#", timeout=self.config.get("timeout", 10))
@@ -71,7 +71,7 @@ class OTAValidator:
         return None
 
     def attempt_get_and_validate(self, command, expected_value):
-        retries = self.config.get("retries", 2)
+        retries = self.config.get("retries", 1)
         for attempt in range(retries):
             self.logger.info(f"[Attempt {attempt + 1}] Sending GET command: {command}")
             self.serial_manager.send_command(command)
