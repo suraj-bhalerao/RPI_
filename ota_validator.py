@@ -91,6 +91,7 @@ class OTAValidator:
             return True
         else:
             self.logger.warning(f"[SET FAIL] No matching response for: {expected_response}")
+            self.serial_manager.send_command(command)
         return False
 
     def wait_for_response(self, keyword=None, timeout=10):
